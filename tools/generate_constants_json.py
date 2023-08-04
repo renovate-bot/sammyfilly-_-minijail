@@ -66,17 +66,13 @@ def parse_llvm_ir(ir):
     table_entries = collections.OrderedDict()
     table_name = ''
     for line in ir:
-        string_constant_match = _STRING_CONSTANT_RE.match(line)
-        if string_constant_match:
+        if string_constant_match := _STRING_CONSTANT_RE.match(line):
             string_constants[string_constant_match.group(
                 1)] = string_constant_match.group(2)
             continue
 
         if '@syscall_table' in line or '@constant_table' in line:
-            if '@syscall_table' in line:
-                table_name = 'syscalls'
-            else:
-                table_name = 'constants'
+            table_name = 'syscalls' if '@syscall_table' in line else 'constants'
             for entry in _TABLE_ENTRY_RE.findall(line):
                 groups = _TABLE_ENTRY_CONTENTS.match(entry)
                 if not groups:

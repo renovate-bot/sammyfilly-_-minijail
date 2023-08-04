@@ -101,7 +101,7 @@ class CompileFilterStatementTests(unittest.TestCase):
             ('>=', ('KILL_PROCESS', 'ALLOW', 'ALLOW')),
         )
         for operator, expectations in cases:
-            block = self._compile('read: arg0 %s 0x100' % operator)
+            block = self._compile(f'read: arg0 {operator} 0x100')
 
             # Check the filter's behavior.
             for bias, expectation in zip(biases, expectations):
@@ -194,10 +194,8 @@ class CompileFilterStatementTests(unittest.TestCase):
             ('>=', ('KILL_PROCESS', 'ALLOW', 'ALLOW')),
         )
         for operator, expectations in cases:
-            short_block = self._compile(
-                'read: arg0 %s %s' % (operator, short_constant_str))
-            long_block = self._compile(
-                'read: arg0 %s %s' % (operator, long_constant_str))
+            short_block = self._compile(f'read: arg0 {operator} {short_constant_str}')
+            long_block = self._compile(f'read: arg0 {operator} {long_constant_str}')
 
             # Check that the emitted code is shorter when the high word of the
             # constant is zero.
@@ -412,7 +410,8 @@ class CompileFileTests(unittest.TestCase):
             frequency_contents = '\n'.join(
                 '%s: %d' % s for s in syscalls.items())
             policy_contents = '@frequency ./test.frequency\n' + '\n'.join(
-                '%s: 1' % s[0] for s in syscalls.items())
+                f'{s[0]}: 1' for s in syscalls.items()
+            )
 
             self._write_file('test.frequency', frequency_contents)
             path = self._write_file('test.policy', policy_contents)
@@ -471,22 +470,19 @@ class CompileFileTests(unittest.TestCase):
 
     def test_compile_huge_filter(self):
         """Ensure jumps while compiling a huge policy are still valid."""
-        # This is intended to force cases where the AST visitation would result
-        # in a combinatorial explosion of calls to Block.accept(). An optimized
-        # implementation should be O(n).
-        num_entries = 128
         syscalls = {}
         # Here we force every single filter to be distinct. Otherwise the
         # codegen layer will coalesce filters that compile to the same
         # instructions.
         policy_contents = []
+        num_entries = 128
         for name in random.sample(
             list(self.arch.syscalls.keys()), num_entries):
             values = random.sample(range(1024), num_entries)
             syscalls[name] = values
             policy_contents.append(
-                '%s: %s' % (name, ' || '.join('arg0 == %d' % value
-                                              for value in values)))
+                f"{name}: {' || '.join('arg0 == %d' % value for value in values)}"
+            )
 
         path = self._write_file('test.policy', '\n'.join(policy_contents))
 

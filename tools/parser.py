@@ -232,10 +232,7 @@ class PolicyParser:
         self._parser_states = [ParserState("<memory>")]
         self._kill_action = kill_action
         self._include_depth_limit = include_depth_limit
-        if denylist:
-            self._default_action = bpf.Allow()
-        else:
-            self._default_action = self._kill_action
+        self._default_action = bpf.Allow() if denylist else self._kill_action
         self._override_default_action = override_default_action
         self._frequency_mapping = collections.defaultdict(int)
         self._arch = arch
@@ -294,9 +291,9 @@ class PolicyParser:
             tokens.pop(0)
             if not tokens:
                 self._parser_state.error('empty complement')
-            if tokens[0].type == 'BITWISE_COMPLEMENT':
-                self._parser_state.error(
-                    'invalid double complement', token=tokens[0])
+        if tokens[0].type == 'BITWISE_COMPLEMENT':
+            self._parser_state.error(
+                'invalid double complement', token=tokens[0])
         if tokens[0].type == 'LPAREN':
             last_open_paren = tokens.pop(0)
             single_value = self.parse_value(tokens)
@@ -433,7 +430,6 @@ class PolicyParser:
         if not tokens:
             self._parser_state.error('missing action')
         action_token = tokens.pop(0)
-        # denylist policies must specify a return for every line.
         if self._denylist:
             if action_token.type != 'RETURN':
                 self._parser_state.error('invalid denylist policy')
@@ -462,11 +458,10 @@ class PolicyParser:
         elif action_token.type == 'RETURN':
             if not tokens:
                 self._parser_state.error('missing return value')
-            if self._ret_log:
-                tokens.pop(0)
-                return bpf.Log()
-            else:
+            if not self._ret_log:
                 return bpf.ReturnErrno(self._parse_single_constant(tokens.pop(0)))
+            tokens.pop(0)
+            return bpf.Log()
         return self._parser_state.error('invalid action', token=action_token)
 
     # single-filter = action
@@ -476,17 +471,16 @@ class PolicyParser:
     def _parse_single_filter(self, tokens):
         if not tokens:
             self._parser_state.error('missing filter')
-        if tokens[0].type == 'ARGUMENT':
-	    # Only argument expressions can start with an ARGUMENT token.
-            argument_expression = self.parse_argument_expression(tokens)
-            if tokens and tokens[0].type == 'SEMICOLON':
-                tokens.pop(0)
-                action = self.parse_action(tokens)
-            else:
-                action = bpf.Allow()
-            return Filter(argument_expression, action)
-        else:
+        if tokens[0].type != 'ARGUMENT':
             return Filter(None, self.parse_action(tokens))
+	    # Only argument expressions can start with an ARGUMENT token.
+        argument_expression = self.parse_argument_expression(tokens)
+        if tokens and tokens[0].type == 'SEMICOLON':
+            tokens.pop(0)
+            action = self.parse_action(tokens)
+        else:
+            action = bpf.Allow()
+        return Filter(argument_expression, action)
 
     # filter = '{' , single-filter , [ { ',' , single-filter } ] , '}'
     #        | single-filter
@@ -550,8 +544,7 @@ class PolicyParser:
             first_token = tokens[0]
             key, value = self._parse_key_value_pair(tokens)
             if key in metadata:
-                self._parser_state.error(
-                    'duplicate metadata key: "%s"' % key, token=first_token)
+                self._parser_state.error(f'duplicate metadata key: "{key}"', token=first_token)
             metadata[key] = value
             if not tokens or tokens[0].type != 'SEMICOLON':
                 break
@@ -660,7 +653,8 @@ class PolicyParser:
                 include_path.value))
         if not os.path.isfile(include_filename):
             self._parser_state.error(
-                'Could not @include %s' % include_filename, token=include_path)
+                f'Could not @include {include_filename}', token=include_path
+            )
         return self._parse_policy_file(include_filename)
 
     def _parse_frequency_file(self, filename):
@@ -714,8 +708,9 @@ class PolicyParser:
                 frequency_path.value))
         if not os.path.isfile(frequency_filename):
             self._parser_state.error(
-                'Could not open frequency file %s' % frequency_filename,
-                token=frequency_path)
+                f'Could not open frequency file {frequency_filename}',
+                token=frequency_path,
+            )
         return self._parse_frequency_file(frequency_filename)
 
     # default-statement = '@default' , default-action
@@ -778,7 +773,7 @@ class PolicyParser:
         """Parse a file and return the list of FilterStatements."""
         self._frequency_mapping = collections.defaultdict(int)
         try:
-            statements = [x for x in self._parse_policy_file(filename)]
+            statements = list(self._parse_policy_file(filename))
         except RecursionError:
             raise ParseException(
                 'recursion limit exceeded',

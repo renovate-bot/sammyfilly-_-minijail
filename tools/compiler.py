@@ -108,9 +108,7 @@ def _compile_single_range(entry,
                           reject_action,
                           lower_bound=0,
                           upper_bound=1e99):
-    action = accept_action
-    if entry.filter:
-        action = entry.filter
+    action = entry.filter if entry.filter else accept_action
     if entry.numbers[1] - entry.numbers[0] == 1:
         # Single syscall.
         # Accept if |X == nr|.

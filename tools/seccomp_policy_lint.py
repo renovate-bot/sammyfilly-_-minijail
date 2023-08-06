@@ -89,9 +89,8 @@ def check_seccomp_policy(check_file, dangerous_syscalls):
             # Empty lines shouldn't reset prev_line_comment.
             continue
         else:
-            match = re.match(fr'^\s*(\w*)\s*:', line)
-            if match:
-                syscall = match.group(1)
+            if match := re.match(fr'^\s*(\w*)\s*:', line):
+                syscall = match[1]
                 if syscall in found_syscalls:
                     errors.append(f'{check_file.name}, line {line_num}: repeat '
                                   f'syscall: {syscall}')
@@ -109,11 +108,6 @@ def check_seccomp_policy(check_file, dangerous_syscalls):
                                               'requires a comment on the '
                                               'preceding line')
                 prev_line_comment = False
-            else:
-                # This line is probably a continuation from the previous line.
-                # TODO(b/203216289): Support line breaks.
-                pass
-
     if contains_dangerous_syscall:
         msg = (f'seccomp: {check_file.name} contains dangerous syscalls, so'
                ' requires review from chromeos-security@')
@@ -121,9 +115,6 @@ def check_seccomp_policy(check_file, dangerous_syscalls):
         msg = (f'seccomp: {check_file.name} does not contain any dangerous'
                ' syscalls, so does not require review from'
                ' chromeos-security@')
-
-    if errors:
-        return CheckPolicyReturn(msg, errors)
 
     return CheckPolicyReturn(msg, errors)
 
@@ -143,7 +134,7 @@ def main(argv=None):
         item_prefix = '\n    * '
         formatted_items = item_prefix + item_prefix.join(check.errors)
 
-    print('* ' + check.message + formatted_items)
+    print(f'* {check.message}{formatted_items}')
 
     return 1 if check.errors else 0
 

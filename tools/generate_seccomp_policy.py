@@ -153,10 +153,11 @@ def get_seccomp_bpf_filter(syscall, entry):
         # See if there is at least one instance of any of these syscalls trying
         # to map memory with both PROT_EXEC and PROT_WRITE. If there isn't, we
         # can craft a concise expression to forbid this.
-        write_and_exec = set(('PROT_EXEC', 'PROT_WRITE'))
+        write_and_exec = {'PROT_EXEC', 'PROT_WRITE'}
         for arg_value in arg_values:
-            if write_and_exec.issubset(set(p.strip() for p in
-                                           arg_value.split('|'))):
+            if write_and_exec.issubset(
+                {p.strip() for p in arg_value.split('|')}
+            ):
                 break
         else:
             atoms.extend(['arg2 in ~PROT_EXEC', 'arg2 in ~PROT_WRITE'])
@@ -257,7 +258,7 @@ def parse_audit_log(audit_log, audit_comm, syscalls, arg_inspection):
             # disjoint set of private syscall numbers.
             match = unknown_syscall_re.match(syscall)
             if match:
-                syscall_num = int(match.group('syscall_num'))
+                syscall_num = int(match['syscall_num'])
                 syscall = PRIVATE_ARM_SYSCALLS.get(syscall_num, syscall)
 
             if ((syscall in arg_inspection and event_type == 'SECCOMP') or
@@ -330,14 +331,16 @@ def main(argv=None):
     # calls are in use (and if necessary manually add a new syscall to the
     # list).
     if opts.frequency is None:
-        sorted_syscalls = list(
-            x[0] for x in sorted(syscalls.items(), key=lambda pair: pair[1],
-                                 reverse=True)
-        )
+        sorted_syscalls = [
+            x[0]
+            for x in sorted(
+                syscalls.items(), key=lambda pair: pair[1], reverse=True
+            )
+        ]
     else:
-        sorted_syscalls = list(
+        sorted_syscalls = [
             x[0] for x in sorted(syscalls.items(), key=lambda pair: pair[0])
-        )
+        ]
 
     print(NOTICE, file=opts.policy)
     if opts.frequency is not None:

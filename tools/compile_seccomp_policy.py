@@ -153,7 +153,7 @@ Warning: MINJAIL_DEFAULT_RET_LOG is on, policy will not have any effect
     # Outputs the bpf binary to a c header file instead of a binary file.
     if opts.output_header_file:
         output_file_base = opts.output
-        with open(output_file_base + '.h', 'w') as output_file:
+        with open(f'{output_file_base}.h', 'w') as output_file:
             program = ', '.join('%i' % x for x in compiled_policy.opcodes)
             output_file.write(HEADER_TEMPLATE % {
                 'upper_name': output_file_base.upper(),

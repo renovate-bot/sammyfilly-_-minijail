@@ -103,25 +103,13 @@ def simulate(instructions, arch, syscall_number, *args):
         elif ins.code == BPF_JMP | BPF_JA | BPF_K:
             program_counter += ins.k
         elif ins.code == BPF_JMP | BPF_JEQ | BPF_K:
-            if register == ins.k:
-                program_counter += ins.jt
-            else:
-                program_counter += ins.jf
+            program_counter += ins.jt if register == ins.k else ins.jf
         elif ins.code == BPF_JMP | BPF_JGT | BPF_K:
-            if register > ins.k:
-                program_counter += ins.jt
-            else:
-                program_counter += ins.jf
+            program_counter += ins.jt if register > ins.k else ins.jf
         elif ins.code == BPF_JMP | BPF_JGE | BPF_K:
-            if register >= ins.k:
-                program_counter += ins.jt
-            else:
-                program_counter += ins.jf
+            program_counter += ins.jt if register >= ins.k else ins.jf
         elif ins.code == BPF_JMP | BPF_JSET | BPF_K:
-            if register & ins.k != 0:
-                program_counter += ins.jt
-            else:
-                program_counter += ins.jf
+            program_counter += ins.jt if register & ins.k != 0 else ins.jf
         elif ins.code == BPF_RET:
             if ins.k == SECCOMP_RET_KILL_PROCESS:
                 return (cost, 'KILL_PROCESS')
@@ -353,7 +341,7 @@ class Atom(AbstractBlock):
             value = (~value) & ((1 << 64) - 1)
             jt, jf = jf, jt
         else:
-            raise Exception('Unknown operator %s' % op)
+            raise Exception(f'Unknown operator {op}')
 
         self.arg_index = arg_index
         self.op = op
@@ -633,12 +621,12 @@ class FlatteningVisitor:
                 SockFilter(BPF_JMP | op | BPF_K, jt_distance, jf_distance,
                            value),
             ]
-        if jt_distance + 1 < 0x100:
+        if jt_distance < 255:
             return [
                 SockFilter(BPF_JMP | op | BPF_K, jt_distance + 1, 0, value),
                 SockFilter(BPF_JMP | BPF_JA, 0, 0, jf_distance),
             ]
-        if jf_distance + 1 < 0x100:
+        if jf_distance < 255:
             return [
                 SockFilter(BPF_JMP | op | BPF_K, 0, jf_distance + 1, value),
                 SockFilter(BPF_JMP | BPF_JA, 0, 0, jt_distance),
@@ -705,9 +693,18 @@ class ArgFilterForwardingVisitor:
             return
         # But the ALLOW, KILL_PROCESS, TRAP, etc. actions are too and we don't
         # want to visit them just yet.
-        if (isinstance(block, KillProcess) or isinstance(block, KillThread)
-                or isinstance(block, Trap) or isinstance(block, ReturnErrno)
-                or isinstance(block, Trace) or isinstance(block, UserNotify)
-                or isinstance(block, Log) or isinstance(block, Allow)):
+        if isinstance(
+            block,
+            (
+                KillProcess,
+                KillThread,
+                Trap,
+                ReturnErrno,
+                Trace,
+                UserNotify,
+                Log,
+                Allow,
+            ),
+        ):
             return
         block.accept(self.visitor)
